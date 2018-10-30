@@ -23,13 +23,15 @@ bool HttpClient::SendRequest(const std::string & method, const std::string & pat
 
 	std::string headerStr;
 
-	for (map<string, string>::iterator it = mConstHeaders.begin(); it != mConstHeaders.end(); it++) {
-		if (headers.find(it->first) == headers.end()) {
+
+
+	for (auto it = mConstHeaders.cbegin(); it != mConstHeaders.cend(); it++) {
+		if (headers.find(it->first) == headers.cend()) {
 			headerStr += it->first + ":" + it->second + "\r\n";
 		}
 	}
 
-	for (map<string, string>::iterator it = headers.begin(); it != headers.end(); it++) {
+	for (auto it = headers.cbegin(); it != headers.cend(); it++) {
 		headerStr += it->first + ":" + it->second + "\r\n";
 	}
 
@@ -44,16 +46,14 @@ bool HttpClient::SendRequest(const std::string & method, const std::string & pat
 	if (!Send(requestLine + headerStr + body)) {
 		return false;
 	}
-
-	return ReadResponse();
+	if(!ReadResponse()){
+		return false;
+	}
+	return mHttpParser.status_code  == 200;
 }
 
 bool HttpClient::GetHeader(std::string name, std::string & value)
 {
-	if (!mHttpParser.IsReadComplete()) {
-		return false;
-	}
-
 	return mHttpParser.GetHeader(name, value);
 }
 
@@ -61,9 +61,6 @@ bool HttpClient::GetHeader(std::string name, std::string & value)
 
 bool HttpClient::GetResponseBody(std::string & body)
 {
-	if (!mHttpParser.IsReadComplete()) {
-		return false;
-	}
 	body = mHttpParser.GetResponseBody();
 	return true;
 }
@@ -72,9 +69,12 @@ bool HttpClient::ReadResponse()
 {
 	mHttpParser.Reset();
 
+
 	std::string tmpBuffer;
-	while (Read(tmpBuffer)) {
+    int len;
+	while (Read(tmpBuffer,len)) {
 		int nCode = mHttpParser.Execute(tmpBuffer.c_str(), tmpBuffer.size());
+
 		if (nCode != 0) {
 			return false;
 		}
@@ -82,8 +82,12 @@ bool HttpClient::ReadResponse()
 		if (mHttpParser.IsReadComplete()) {
 			return true;
 		}
-
 	}
+
+    //没有 ContentLen 会返回ULLONG_MAX
+    if(mHttpParser.content_length == 0 || mHttpParser.content_length== ULLONG_MAX){
+        return true;
+    }
 
 	return false;
 }
@@ -94,11 +98,13 @@ bool HttpClient::SendGet(const std::string & path)
 	return SendRequest("GET", path, myMap, "");
 }
 
-bool HttpClient::SendPost(const std::string & path, const std::string body)
+bool HttpClient::SendPost(const std::string & path, const std::string& body)
 {
 	static const std::map<std::string, std::string> myMap;
 	return SendRequest("POST", path, myMap, body);
 }
+
+
 
 
 

@@ -2,9 +2,10 @@
 #include "http_parser.h"
 #include <algorithm>
 #include <iostream>
-
+#include <ctype.h>
 using namespace std;
 HttpParser::HttpParser(enum http_parser_type type)
+	:mType(type),mErrorCode(0)
 {
 	mSettings.on_message_begin = &HttpParser::onMessageBegin;
 	mSettings.on_url = &HttpParser::onUrl;
@@ -16,9 +17,6 @@ HttpParser::HttpParser(enum http_parser_type type)
 	mSettings.on_message_complete = &HttpParser::onMessageComplete;
 	mSettings.on_chunk_header = &HttpParser::onChunkHeader;
 	mSettings.on_chunk_complete = &HttpParser::onChunkComplete;
-
-	http_parser_init(&mParser, type);
-	mParser.data = this;
 
 	Reset();
 }
@@ -44,10 +42,11 @@ int HttpParser::handleStatus(const char * at, size_t length)
 	return 0;
 }
 
+
 int HttpParser::handleHeaderField(const char* at, size_t length)
 {
 	std::string field(at, length);
-	std::transform(field.begin(), field.end(), field.begin(), tolower);
+	std::transform(field.begin(), field.end(), field.begin(), ::tolower);
 
 	switch (last_on_header) {
 	case NOTHING:
@@ -58,7 +57,7 @@ int HttpParser::handleHeaderField(const char* at, size_t length)
 		// New header started.
 		// Copy current name,value buffers to headers
 		// list and allocate new buffer for new name
-		mHeanders[header_field] = header_value;
+		mHeaders[header_field] = header_value;
 		header_field = field;
 		break;
 	case FIELD:
@@ -99,7 +98,7 @@ int HttpParser::handleHeadersComplete()
 {
 	/* Add the most recently read header to the map, if any */
 	if (last_on_header == VALUE) {
-		mHeanders[header_field] = header_value;
+		mHeaders[header_field] = header_value;
 		header_field = "";
 		header_value = "";
 	}
@@ -129,6 +128,7 @@ int HttpParser::handleChunkHeader()
 
 int HttpParser::handleChunkComplete()
 {
+    mMessageComplete = true;
 	return 0;
 }
 
@@ -137,24 +137,21 @@ int HttpParser::Execute(const char* buffer, size_t count)
 	if (mMessageComplete) {
 		Reset();
 	}
-	int n = http_parser_execute(&mParser, &mSettings, buffer, count);
+	int n = http_parser_execute(this, &mSettings, buffer, count);
 
-	if (mParser.upgrade) //TODO
+	if (this->upgrade) //TODO
 	{
 		return 1000;
 	}
 	else if (n != count)
 	{
-		mErrorCode = (mParser.http_errno != 0 ? mParser.http_errno : 400);
+		mErrorCode = (this->http_errno != 0 ?this->http_errno : 400);
 		return mErrorCode;
 	}
 	return 0;
 }
 
-bool HttpParser::IsHeadersComplete()
-{
-	return mHeadersComplete;
-}
+
 
 bool HttpParser::IsReadComplete()
 {
@@ -173,18 +170,19 @@ std::string & HttpParser::GetResponseBody()
 
 bool HttpParser::GetHeader(std::string name, std::string & value)
 {
-	map<string,string>::iterator it =  mHeanders.find(name);
-	if (it == mHeanders.end()) {
+	if(mHeaders.count(name) == 0){
 		return false;
 	}
 
-	value =  it->second;
+	value = mHeaders[name];
 	return true;
 }
 
 void HttpParser::Reset()
 {
-	mHeanders.clear();
+	http_parser_init(this, mType);
+	this->data = this;
+	mHeaders.clear();
 	mBody.clear();
 	header_field = "";
 	header_value = "";
@@ -252,3 +250,6 @@ int HttpParser::onChunkComplete(http_parser *parser)
 	HttpParser* p = (HttpParser*)parser->data;
 	return p->handleChunkComplete();
 }
+
+
+

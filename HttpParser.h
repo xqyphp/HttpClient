@@ -2,8 +2,10 @@
 #include "http_parser.h"
 
 #include <map>
+#include <string>
 
-class HttpParser
+class HttpParser :
+public http_parser
 {
 public:
 	HttpParser(enum http_parser_type type);
@@ -11,7 +13,9 @@ public:
 
 
 	int Execute(const char * buffer, size_t count);
-	bool IsHeadersComplete();
+
+    //uint64_t  GetContentLen(){return mParser.content_length;}
+    //无法判断非指定长度，在HttpClient中判断
 	bool IsReadComplete();
 	int GetErrorCode();
 	std::string& GetResponseBody();
@@ -44,10 +48,10 @@ private:
 
 	typedef enum { NOTHING, FIELD, VALUE } last_on_header_t;
 
-   	http_parser mParser;
+   	//http_parser mParser;
 	http_parser_settings mSettings;
 
-	std::map<std::string, std::string> mHeanders;
+	std::map<std::string, std::string> mHeaders;
 	std::string mBody;
 	int mErrorCode;
 	bool mHeadersComplete;
@@ -56,6 +60,7 @@ private:
 	std::string header_value;
 	std::string header_field;
 	last_on_header_t last_on_header;
-	
+
+	enum http_parser_type mType;
 };
 

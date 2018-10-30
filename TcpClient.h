@@ -21,11 +21,13 @@ public:
 
 	bool Send(const std::string& text);
 	bool Read(std::string& text);
+    bool Read(std::string& text,int &code);
 	bool ReadUtil(std::string& text, const std::string& util);
 	bool ReadAll(std::string& text, size_t len);
 
 	bool IsConnected();
 	int  GetErrorNo();
+	std::string GetErrorString();
 	int  GetTimeOut() { return mTimeOut; }
 
 
@@ -43,7 +45,7 @@ protected:
 	int  mPort;
 	int  mErrorNo;
 	int  mTimeOut;
-	int  mReadBlockSize;
+	size_t  mReadBlockSize;
 	int	 mSocketFd;
 	bool mbConnected;
 	std::string mReadBuffer;

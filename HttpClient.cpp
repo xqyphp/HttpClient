@@ -17,39 +17,43 @@ HttpClient::~HttpClient()
 
 bool HttpClient::SendRequest(const std::string & method, const std::string & path, std::map<std::string, std::string> headers, const std::string body)
 {
-	std::string requestLine;
-
-	requestLine += method + " " + (path.size() == 0 ? "/" : path) + " HTTP/1.1\r\n";
-
-	std::string headerStr;
-
-
-
-	for (auto it = mConstHeaders.cbegin(); it != mConstHeaders.cend(); it++) {
-		if (headers.find(it->first) == headers.cend()) {
-			headerStr += it->first + ":" + it->second + "\r\n";
+	const char *BLANK_SPACE = " ";
+	const char *NEW_LINE = "\r\n";
+	//请求行
+	std::string requestContent;
+	requestContent.append(method).append(BLANK_SPACE);
+	if (path.size() == 0 || path[0] != '/') {
+		requestContent.append("/");
+	}
+	requestContent.append(path);
+	requestContent.append(BLANK_SPACE).append("HTTP/1.1").append(NEW_LINE);
+	//请求头
+	for (auto it = mConstHeaders.begin(); it != mConstHeaders.end(); it++) {
+		if (headers.find(it->first) == headers.end()) {
+			requestContent.append(it->first).append(":").append(it->second).append(NEW_LINE);
 		}
 	}
-
-	for (auto it = headers.cbegin(); it != headers.cend(); it++) {
-		headerStr += it->first + ":" + it->second + "\r\n";
+	for (auto it = headers.begin(); it != headers.end(); it++) {
+		if (headers.find(it->first) == headers.end()) {
+			requestContent.append(it->first).append(":").append(it->second).append(NEW_LINE);
+		}
 	}
-
+	//请求体长度
 	if (body.size() != 0) {
 		char c[64];
-		int length = snprintf(c,sizeof(c), "Content - Length:%d\r\n", body.size());
-		headerStr += c;
+		int length = snprintf(c, sizeof(c), "Content - Length: %d\r\n", (int)body.size());
+		requestContent.append(c);
 	}
-
-	headerStr += "\r\n";
-
-	if (!Send(requestLine + headerStr + body)) {
+	//回车换行
+	requestContent.append(NEW_LINE);
+	//请求体
+	requestContent.append(body);
+	//发送请求
+	if (!Send(requestContent)) {
 		return false;
 	}
-	if(!ReadResponse()){
-		return false;
-	}
-	return mHttpParser.status_code  == 200;
+	//读取结果
+	return ReadResponse();
 }
 
 bool HttpClient::GetHeader(std::string name, std::string & value)

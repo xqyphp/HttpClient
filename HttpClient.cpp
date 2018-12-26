@@ -12,7 +12,6 @@ HttpClient::HttpClient(const std::string & host, int port)
 
 HttpClient::~HttpClient()
 {
-	TcpClient::~TcpClient();
 }
 
 bool HttpClient::SendRequest(const std::string & method, const std::string & path, std::map<std::string, std::string> headers, const std::string body)
